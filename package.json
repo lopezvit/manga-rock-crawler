@@ -1,0 +1,17 @@
+{
+  "name": "mangarock",
+  "version": "1.0.0",
+  "description": "Download files to create a cbr",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Alejandro López Vidal",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "archiver": "^3.0.0",
+    "jsdom": "^13.0.0",
+    "manga-rock-image-decoder": "^1.0.1",
+    "webp-converter": "^2.1.6"
+  }
+}
