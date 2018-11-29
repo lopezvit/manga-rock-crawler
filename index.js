@@ -8,35 +8,41 @@ const decode = require("manga-rock-image-decoder");
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
 
-const serieUrl = "https://mangarock.com/manga/mrs-serie-295440/";
-const originalChapter =
-  "https://mangarock.com/manga/mrs-serie-295440/chapter/mrs-chapter-100290684";
-const apiVersion = "web400";
+const parallel = true;
+const serie = "neverland";
+const firstNumber = 112;
+const lastNumber = 113;
+
+let serieUrl, serieName, serieStartsAt;
+switch (serie) {
+  case "neverland":
+    serieUrl = "https://mangarock.com/manga/mrs-serie-303939";
+    serieName = "neverland";
+    serieStartsAt = 1;
+    break;
+  case "attack":
+    serieUrl = "https://mangarock.com/manga/mrs-serie-295440/";
+    serieName = "shingeki";
+    serieStartsAt = 0;
+  default:
+    break;
+}
+
+//const originalChapter =
+//  "https://mangarock.com/manga/mrs-serie-295440/chapter/mrs-chapter-100290684";
+const apiVersion = "web401";
 const country = "Finland";
 //const oid = "mrs-chapter-100290684";
 
 const newURL = "https://mri-image-decoder.now.sh/?url=";
-const capNumbers = [109, 110, 111];
+const capNumbers = Array.from(
+  { length: lastNumber - firstNumber + 1 },
+  (v, k) => k + firstNumber - serieStartsAt
+);
+let domSerie;
 (async () => {
   try {
-    await Promise.all(
-      capNumbers.map(async capNumber => await downloadCap(capNumber))
-    );
-  } catch (error) {
-    console.log(error);
-  }
-})();
-
-async function downloadCap(capNumber) {
-  try {
-    const dir = `./shingeki_${capNumber}`;
-
-    let page = 100;
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir);
-    }
-    const bufferSerie = await downloadBuffer(serieUrl);
-    const domSerie = await JSDOM.fromURL(serieUrl, {
+    domSerie = await JSDOM.fromURL(serieUrl, {
       runScripts: "outside-only"
     });
     for (const script of domSerie.window.document.scripts) {
@@ -46,8 +52,31 @@ async function downloadCap(capNumber) {
         break;
       }
     }
+    if (parallel) {
+      await Promise.all(
+        capNumbers.map(async capNumber => await downloadCap(capNumber))
+      );
+    } else {
+      for (const capNumber of capNumbers) {
+        await downloadCap(capNumber);
+        //console.log(capNumber + padDigits(capNumber + serieStartsAt, 3));
+      }
+    }
+  } catch (error) {
+    console.log(error);
+  }
+})();
+
+async function downloadCap(capNumber) {
+  try {
+    const dir = `./${serieName}_${padDigits(capNumber + serieStartsAt, 3)}`;
+
+    let page = 100;
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir);
+    }
     const chapter = domSerie.window.APP_STATE.currentManga.info.chapters.find(
-      chapter => chapter.order === capNumber + 1
+      chapter => chapter.order === capNumber
     );
     console.log(chapter);
     const dataChapter = `https://api.mangarockhd.com/query/${apiVersion}/pages?oid=${
@@ -91,23 +120,8 @@ Converted Successfully`
       })
     );
     console.log("All the conversions done!");
-    //await zipDirectory(dir, dir + ".cbz");
-    /* const child = spawnSync(
-      "kcc-c2e",
-      [
-        "--profile=KV",
-        "--manga-style",
-        "--format=MOBI",
-        "--upscale",
-        "--splitter=2",
-        dir
-      ],
-      {
-        stdio: "inherit"
-      }
-    ); */
 
-    await executeConversion(dir);
+    await executeConversion(dir, chapter.name);
     console.log("Conversion done!");
     deleteFolderRecursive(dir);
     console.log("Directory deleted!");
@@ -172,7 +186,7 @@ function deleteFolderRecursive(path) {
   }
 }
 
-function executeConversion(path) {
+function executeConversion(path, title) {
   return new Promise((resolve, reject) => {
     const child = spawn("kcc-c2e", [
       "--profile=KV",
@@ -180,6 +194,7 @@ function executeConversion(path) {
       "--format=MOBI",
       "--upscale",
       "--splitter=2",
+      `--title=${title}`,
       path
     ]);
     child.stdout.on("data", data => {
@@ -192,4 +207,10 @@ function executeConversion(path) {
     child.on("error", error => reject(error));
     child.on("exit", data => resolve(data));
   });
+}
+
+function padDigits(number, digits) {
+  return (
+    Array(Math.max(digits - String(number).length + 1, 0)).join(0) + number
+  );
 }
